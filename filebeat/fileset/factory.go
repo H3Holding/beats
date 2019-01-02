@@ -38,7 +38,7 @@ var (
 )
 
 func init() {
-	monitoring.NewFunc(monitoring.GetNamespace("state").GetRegistry(), "module", moduleList.Report, monitoring.Report)
+	monitoring.NewFunc(monitoring.GetNamespace("state").GetRegistry(), "filebeat_module", moduleList.Report, monitoring.Report)
 }
 
 // Factory for modules

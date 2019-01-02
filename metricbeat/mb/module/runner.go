@@ -31,7 +31,7 @@ var (
 
 func init() {
 	moduleList = monitoring.NewUniqueList()
-	monitoring.NewFunc(monitoring.GetNamespace("state").GetRegistry(), "module", moduleList.Report, monitoring.Report)
+	monitoring.NewFunc(monitoring.GetNamespace("state").GetRegistry(), "metricbeat_module", moduleList.Report, monitoring.Report)
 }
 
 // Runner is a facade for a Wrapper that provides a simple interface
