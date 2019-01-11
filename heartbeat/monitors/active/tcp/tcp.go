@@ -68,7 +68,6 @@ func create(
 		return nil, 0, err
 	}
 
-	typ := config.Name
 	timeout := config.Timeout
 	validator := makeValidateConn(&config)
 
@@ -87,8 +86,15 @@ func create(
 			return nil, 0, err
 		}
 
-		epJobs, err := dialchain.MakeDialerJobs(db, typ, scheme, eps, config.Mode,
+		epJobs, err := dialchain.MakeDialerJobs(db, scheme, eps, config.Mode,
 			func(event *beat.Event, dialer transport.Dialer, addr string) error {
+				u, err := url.Parse(fmt.Sprintf("%s://%s", scheme, addr))
+				if err != nil {
+					return err
+				}
+
+				monitors.MergeEventFields(event, common.MapStr{"url": monitors.URLFields(u)})
+
 				return pingHost(event, dialer, addr, timeout, validator)
 			})
 		if err != nil {
