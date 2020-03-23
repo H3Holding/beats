@@ -8,10 +8,10 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/libbeat/common/file"
-	"github.com/elastic/beats/libbeat/paths"
-	"github.com/elastic/beats/x-pack/libbeat/management/api"
+	"github.com/elastic/beats/v7/libbeat/common"
+	"github.com/elastic/beats/v7/libbeat/common/file"
+	"github.com/elastic/beats/v7/libbeat/paths"
+	"github.com/elastic/beats/v7/x-pack/libbeat/management/api"
 
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
@@ -19,9 +19,7 @@ import (
 
 // Cache keeps a copy of configs provided by Kibana, it's used when Kibana is down
 type Cache struct {
-	// ConfigOK is true if last config update was successful
-	ConfigOK bool
-	Configs  api.ConfigBlocks
+	Configs api.ConfigBlocks
 }
 
 // Load settings from its source file

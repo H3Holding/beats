@@ -22,13 +22,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/libbeat/logp"
-	"github.com/elastic/beats/libbeat/monitoring"
+	"github.com/elastic/beats/v7/libbeat/common"
+	"github.com/elastic/beats/v7/libbeat/logp"
+	"github.com/elastic/beats/v7/libbeat/monitoring"
 
-	"github.com/elastic/beats/packetbeat/pb"
-	"github.com/elastic/beats/packetbeat/protos"
-	"github.com/elastic/beats/packetbeat/protos/tcp"
+	"github.com/elastic/beats/v7/packetbeat/pb"
+	"github.com/elastic/beats/v7/packetbeat/protos"
+	"github.com/elastic/beats/v7/packetbeat/protos/tcp"
 )
 
 var (
@@ -437,6 +437,7 @@ func (amqp *amqpPlugin) publishTransaction(t *amqpTransaction) {
 	pbf.Event.Dataset = "amqp"
 	pbf.Network.Protocol = pbf.Event.Dataset
 	pbf.Network.Transport = "tcp"
+	pbf.Error.Message = t.notes
 
 	fields := evt.Fields
 	fields["type"] = pbf.Event.Dataset
@@ -488,12 +489,6 @@ func (amqp *amqpPlugin) publishTransaction(t *amqpTransaction) {
 		} else {
 			fields["response"] = t.response
 		}
-	}
-
-	if len(t.notes) == 1 {
-		evt.PutValue("error.message", t.notes[0])
-	} else if len(t.notes) > 1 {
-		evt.PutValue("error.message", t.notes)
 	}
 
 	amqp.results(evt)

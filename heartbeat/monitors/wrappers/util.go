@@ -21,10 +21,10 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/elastic/beats/heartbeat/eventext"
-	"github.com/elastic/beats/heartbeat/monitors/jobs"
-	"github.com/elastic/beats/libbeat/beat"
-	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/v7/heartbeat/eventext"
+	"github.com/elastic/beats/v7/heartbeat/monitors/jobs"
+	"github.com/elastic/beats/v7/libbeat/beat"
+	"github.com/elastic/beats/v7/libbeat/common"
 )
 
 // WithFields wraps a Job and all continuations, updating all events returned with the set of
@@ -58,7 +58,15 @@ func URLFields(u *url.URL) common.MapStr {
 	}
 
 	if u.Port() != "" {
-		fields["port"], _ = strconv.ParseUint(u.Port(), 10, 8)
+		// Returns a uint64 believe it or not.
+		val, _ := strconv.ParseUint(u.Port(), 10, 16)
+		fields["port"] = uint16(val)
+	} else {
+		if u.Scheme == "http" {
+			fields["port"] = uint16(80)
+		} else if u.Scheme == "https" {
+			fields["port"] = uint16(443)
+		}
 	}
 
 	if u.Path != "" {

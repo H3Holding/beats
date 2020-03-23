@@ -22,13 +22,13 @@ import (
 	"math"
 	"time"
 
-	"github.com/elastic/beats/libbeat/publisher/queue"
+	"github.com/elastic/beats/v7/libbeat/publisher/queue"
 	"github.com/elastic/go-txfile/pq"
 )
 
 type inBroker struct {
-	ctx     *spoolCtx
-	eventer queue.Eventer
+	ctx         *spoolCtx
+	ackListener queue.ACKListener
 
 	// active state handler
 	state func(*inBroker) bool
@@ -73,7 +73,7 @@ const (
 
 func newInBroker(
 	ctx *spoolCtx,
-	eventer queue.Eventer,
+	ackListener queue.ACKListener,
 	qu *pq.Queue,
 	codec codecID,
 	flushTimeout time.Duration,
@@ -90,9 +90,9 @@ func newInBroker(
 	}
 
 	b := &inBroker{
-		ctx:     ctx,
-		eventer: eventer,
-		state:   (*inBroker).stateEmpty,
+		ctx:         ctx,
+		ackListener: ackListener,
+		state:       (*inBroker).stateEmpty,
 
 		// API
 		events:    make(chan pushRequest, inEventChannelSize),
@@ -127,12 +127,15 @@ func (b *inBroker) Producer(cfg queue.ProducerConfig) queue.Producer {
 // run in the same go-routine as the Flush was executed from.
 // Only the (*inBroker).eventLoop triggers a flush.
 func (b *inBroker) onFlush(n uint) {
+	log := b.ctx.logger
+	log.Debug("inbroker: onFlush ", n)
+
 	if n == 0 {
 		return
 	}
 
-	if b.eventer != nil {
-		b.eventer.OnACK(int(n))
+	if b.ackListener != nil {
+		b.ackListener.OnACK(int(n))
 	}
 	b.ctx.logger.Debug("inbroker: flushed events:", n)
 	b.bufferedEvents -= n
@@ -379,7 +382,7 @@ func (b *inBroker) stateWithTimer() bool {
 		b.handleCancel(&req)
 
 	case <-b.timer.C:
-		log.Debug("inbroker (stateWithTimer): flush timeout")
+		log.Debug("inbroker (stateWithTimer): flush timeout", b.bufferedEvents)
 
 		b.timer.Stop(true)
 
@@ -394,7 +397,7 @@ func (b *inBroker) stateWithTimer() bool {
 
 		if b.bufferedEvents > 0 {
 			// flush did not push all events? Restart timer.
-			log.Debug("  inbroker (stateWithTimer): start flush timer")
+			log.Debug("  inbroker (stateWithTimer): start flush timer", b.bufferedEvents)
 			b.timer.Start()
 			break
 		}

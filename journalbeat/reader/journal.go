@@ -25,18 +25,19 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
-	"github.com/coreos/go-systemd/sdjournal"
+	"github.com/coreos/go-systemd/v22/sdjournal"
 	"github.com/pkg/errors"
 
-	"github.com/elastic/beats/journalbeat/checkpoint"
-	"github.com/elastic/beats/journalbeat/cmd/instance"
-	"github.com/elastic/beats/journalbeat/config"
-	"github.com/elastic/beats/libbeat/beat"
-	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/libbeat/common/backoff"
-	"github.com/elastic/beats/libbeat/logp"
+	"github.com/elastic/beats/v7/journalbeat/checkpoint"
+	"github.com/elastic/beats/v7/journalbeat/cmd/instance"
+	"github.com/elastic/beats/v7/journalbeat/config"
+	"github.com/elastic/beats/v7/libbeat/beat"
+	"github.com/elastic/beats/v7/libbeat/common"
+	"github.com/elastic/beats/v7/libbeat/common/backoff"
+	"github.com/elastic/beats/v7/libbeat/logp"
 )
 
 // Reader reads entries from journal(s).
@@ -153,6 +154,7 @@ func (r *Reader) seek(cursor string) {
 				r.logger.Debug("Seeking method set to cursor, but no state is saved for reader. Starting to read from the beginning")
 			case config.SeekTail:
 				r.journal.SeekTail()
+				r.journal.Next()
 				r.logger.Debug("Seeking method set to cursor, but no state is saved for reader. Starting to read from the end")
 			default:
 				r.logger.Error("Invalid option for cursor_seek_fallback")
@@ -185,37 +187,55 @@ func (r *Reader) Next() (*beat.Event, error) {
 		case <-r.done:
 			return nil, nil
 		default:
-			event, err := r.readEvent()
+		}
+
+		c, err := r.journal.Next()
+		if err != nil && err != io.EOF {
+			return nil, err
+		}
+
+		switch {
+		// error while reading next entry
+		case c < 0:
+			return nil, fmt.Errorf("error while reading next entry %+v", syscall.Errno(-c))
+		// no new entry, so wait
+		case c == 0:
+			hasNewEntry, err := r.checkForNewEvents()
 			if err != nil {
 				return nil, err
 			}
-
-			if event == nil {
+			if !hasNewEntry {
 				r.backoff.Wait()
-				continue
 			}
-
-			r.backoff.Reset()
-			return event, nil
+			continue
+		// new entries are available
+		default:
 		}
-	}
-}
 
-func (r *Reader) readEvent() (*beat.Event, error) {
-	n, err := r.journal.Next()
-	if err != nil && err != io.EOF {
-		return nil, err
-	}
-
-	for n == 1 {
 		entry, err := r.journal.GetEntry()
 		if err != nil {
 			return nil, err
 		}
 		event := r.toEvent(entry)
+		r.backoff.Reset()
+
 		return event, nil
 	}
-	return nil, nil
+}
+
+func (r *Reader) checkForNewEvents() (bool, error) {
+	c := r.journal.Wait(100 * time.Millisecond)
+	switch c {
+	case sdjournal.SD_JOURNAL_NOP:
+		return false, nil
+	// new entries are added or the journal has changed (e.g. vacuum, rotate)
+	case sdjournal.SD_JOURNAL_APPEND, sdjournal.SD_JOURNAL_INVALIDATE:
+		return true, nil
+	default:
+	}
+
+	r.logger.Errorf("Unknown return code from Wait: %d\n", c)
+	return false, nil
 }
 
 // toEvent creates a beat.Event from journal entries.
@@ -235,6 +255,15 @@ func (r *Reader) toEvent(entry *sdjournal.JournalEntry) *beat.Event {
 
 	if len(custom) != 0 {
 		fields.Put("journald.custom", custom)
+	}
+
+	// if entry is coming from a remote journal, add_host_metadata overwrites the source hostname, so it
+	// has to be copied to a different field
+	if r.config.SaveRemoteHostname {
+		remoteHostname, err := fields.GetValue("host.hostname")
+		if err == nil {
+			fields.Put("log.source.address", remoteHostname)
+		}
 	}
 
 	state := checkpoint.JournalState{
@@ -259,8 +288,16 @@ func (r *Reader) convertNamedField(fc fieldConversion, value string) interface{}
 	if fc.isInteger {
 		v, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
-			r.logger.Debugf("Failed to convert field: %s \"%v\" to int: %v", fc.name, value, err)
-			return value
+			// On some versions of systemd the 'syslog.pid' can contain the username
+			// appended to the end of the pid. In most cases this does not occur
+			// but in the cases that it does, this tries to strip ',\w*' from the
+			// value and then perform the conversion.
+			s := strings.Split(value, ",")
+			v, err = strconv.ParseInt(s[0], 10, 64)
+			if err != nil {
+				r.logger.Debugf("Failed to convert field: %s \"%v\" to int: %v", fc.name, value, err)
+				return value
+			}
 		}
 		return v
 	}

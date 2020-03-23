@@ -5,23 +5,26 @@
 package process
 
 import (
+	"encoding/binary"
 	"fmt"
 	"os"
+	"os/user"
 	"runtime"
 	"strconv"
 	"time"
 
-	"github.com/OneOfOne/xxhash"
+	"github.com/cespare/xxhash/v2"
 	"github.com/gofrs/uuid"
 	"github.com/pkg/errors"
 
-	"github.com/elastic/beats/auditbeat/datastore"
-	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/libbeat/common/cfgwarn"
-	"github.com/elastic/beats/libbeat/logp"
-	"github.com/elastic/beats/libbeat/metric/system/process"
-	"github.com/elastic/beats/metricbeat/mb"
-	"github.com/elastic/beats/x-pack/auditbeat/cache"
+	"github.com/elastic/beats/v7/auditbeat/datastore"
+	"github.com/elastic/beats/v7/auditbeat/helper/hasher"
+	"github.com/elastic/beats/v7/libbeat/common"
+	"github.com/elastic/beats/v7/libbeat/common/cfgwarn"
+	"github.com/elastic/beats/v7/libbeat/logp"
+	"github.com/elastic/beats/v7/metricbeat/mb"
+	"github.com/elastic/beats/v7/x-pack/auditbeat/cache"
+	"github.com/elastic/beats/v7/x-pack/auditbeat/module/system"
 	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
 )
@@ -72,25 +75,30 @@ func init() {
 
 // MetricSet collects data about the host.
 type MetricSet struct {
-	mb.BaseMetricSet
+	system.SystemMetricSet
 	config    Config
 	cache     *cache.Cache
 	log       *logp.Logger
 	bucket    datastore.Bucket
 	lastState time.Time
+	hasher    *hasher.FileHasher
 
 	suppressPermissionWarnings bool
 }
 
 // Process represents information about a process.
 type Process struct {
-	Info  types.ProcessInfo
-	Error error
+	Info     types.ProcessInfo
+	UserInfo *types.UserInfo
+	User     *user.User
+	Group    *user.Group
+	Hashes   map[hasher.HashType]hasher.Digest
+	Error    error
 }
 
 // Hash creates a hash for Process.
 func (p Process) Hash() uint64 {
-	h := xxhash.New64()
+	h := xxhash.New()
 	h.WriteString(strconv.Itoa(p.Info.PID))
 	h.WriteString(p.Info.StartTime.String())
 	return h.Sum64()
@@ -109,9 +117,18 @@ func (p Process) toMapStr() common.MapStr {
 	}
 }
 
+// entityID creates an ID that uniquely identifies this process across machines.
+func (p Process) entityID(hostID string) string {
+	h := system.NewEntityHash()
+	h.Write([]byte(hostID))
+	binary.Write(h, binary.LittleEndian, int64(p.Info.PID))
+	binary.Write(h, binary.LittleEndian, int64(p.Info.StartTime.Nanosecond()))
+	return h.Sum()
+}
+
 // New constructs a new MetricSet.
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
-	cfgwarn.Experimental("The %v/%v dataset is experimental", moduleName, metricsetName)
+	cfgwarn.Beta("The %v/%v dataset is beta", moduleName, metricsetName)
 
 	config := defaultConfig
 	if err := base.Module().UnpackConfig(&config); err != nil {
@@ -123,12 +140,18 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 		return nil, errors.Wrap(err, "failed to open persistent datastore")
 	}
 
+	hasher, err := hasher.NewFileHasher(config.HasherConfig, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	ms := &MetricSet{
-		BaseMetricSet: base,
-		config:        config,
-		log:           logp.NewLogger(metricsetName),
-		cache:         cache.New(),
-		bucket:        bucket,
+		SystemMetricSet: system.NewSystemMetricSet(base),
+		config:          config,
+		log:             logp.NewLogger(metricsetName),
+		cache:           cache.New(),
+		bucket:          bucket,
+		hasher:          hasher,
 	}
 
 	// Load from disk: Time when state was last sent
@@ -147,7 +170,7 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 		ms.log.Debug("No state timestamp found")
 	}
 
-	if os.Geteuid() != 0 {
+	if runtime.GOOS != "windows" && os.Geteuid() != 0 {
 		ms.log.Warn("Running as non-root user, will likely not report all processes.")
 	}
 
@@ -201,13 +224,15 @@ func (ms *MetricSet) reportState(report mb.ReporterV2) error {
 		return errors.Wrap(err, "error generating state ID")
 	}
 	for _, p := range processes {
+		ms.enrichProcess(p)
+
 		if p.Error == nil {
-			event := processEvent(p, eventTypeState, eventActionExistingProcess)
+			event := ms.processEvent(p, eventTypeState, eventActionExistingProcess)
 			event.RootFields.Put("event.id", stateID.String())
 			report.Event(event)
 		} else {
 			ms.log.Warn(p.Error)
-			report.Event(processEvent(p, eventTypeError, eventActionProcessError))
+			report.Event(ms.processEvent(p, eventTypeError, eventActionProcessError))
 		}
 	}
 
@@ -241,12 +266,13 @@ func (ms *MetricSet) reportChanges(report mb.ReporterV2) error {
 
 	for _, cacheValue := range started {
 		p := cacheValue.(*Process)
+		ms.enrichProcess(p)
 
 		if p.Error == nil {
-			report.Event(processEvent(p, eventTypeEvent, eventActionProcessStarted))
+			report.Event(ms.processEvent(p, eventTypeEvent, eventActionProcessStarted))
 		} else {
 			ms.log.Warn(p.Error)
-			report.Event(processEvent(p, eventTypeError, eventActionProcessError))
+			report.Event(ms.processEvent(p, eventTypeError, eventActionProcessError))
 		}
 	}
 
@@ -254,14 +280,42 @@ func (ms *MetricSet) reportChanges(report mb.ReporterV2) error {
 		p := cacheValue.(*Process)
 
 		if p.Error == nil {
-			report.Event(processEvent(p, eventTypeEvent, eventActionProcessStopped))
+			report.Event(ms.processEvent(p, eventTypeEvent, eventActionProcessStopped))
 		}
 	}
 
 	return nil
 }
 
-func processEvent(process *Process, eventType string, action eventAction) mb.Event {
+// enrichProcess enriches a process with user lookup information
+// and executable file hash.
+func (ms *MetricSet) enrichProcess(process *Process) {
+	if process.UserInfo != nil {
+		goUser, err := user.LookupId(process.UserInfo.UID)
+		if err == nil {
+			process.User = goUser
+		}
+
+		group, err := user.LookupGroupId(process.UserInfo.GID)
+		if err == nil {
+			process.Group = group
+		}
+	}
+
+	if process.Info.Exe != "" {
+		hashes, err := ms.hasher.HashFile(process.Info.Exe)
+		if err != nil {
+			if process.Error == nil {
+				process.Error = errors.Wrapf(err, "failed to hash executable %v for PID %v", process.Info.Exe,
+					process.Info.PID)
+			}
+		} else {
+			process.Hashes = hashes
+		}
+	}
+}
+
+func (ms *MetricSet) processEvent(process *Process, eventType string, action eventAction) mb.Event {
 	event := mb.Event{
 		RootFields: common.MapStr{
 			"event": common.MapStr{
@@ -273,11 +327,51 @@ func processEvent(process *Process, eventType string, action eventAction) mb.Eve
 		},
 	}
 
+	if process.UserInfo != nil {
+		putIfNotEmpty(&event.RootFields, "user.id", process.UserInfo.UID)
+		putIfNotEmpty(&event.RootFields, "user.group.id", process.UserInfo.GID)
+
+		putIfNotEmpty(&event.RootFields, "user.effective.id", process.UserInfo.EUID)
+		putIfNotEmpty(&event.RootFields, "user.effective.group.id", process.UserInfo.EGID)
+
+		putIfNotEmpty(&event.RootFields, "user.saved.id", process.UserInfo.SUID)
+		putIfNotEmpty(&event.RootFields, "user.saved.group.id", process.UserInfo.SGID)
+	}
+
+	if process.User != nil {
+		if process.User.Username != "" {
+			event.RootFields.Put("user.name", process.User.Username)
+		} else if process.User.Name != "" {
+			event.RootFields.Put("user.name", process.User.Name)
+		}
+	}
+
+	if process.Group != nil {
+		event.RootFields.Put("user.group.name", process.Group.Name)
+	}
+
+	if process.Hashes != nil {
+		for hashType, digest := range process.Hashes {
+			fieldName := "process.hash." + string(hashType)
+			event.RootFields.Put(fieldName, digest)
+		}
+	}
+
 	if process.Error != nil {
 		event.RootFields.Put("error.message", process.Error.Error())
 	}
 
+	if ms.HostID() != "" {
+		event.RootFields.Put("process.entity_id", process.entityID(ms.HostID()))
+	}
+
 	return event
+}
+
+func putIfNotEmpty(mapstr *common.MapStr, key string, value string) {
+	if value != "" {
+		mapstr.Put(key, value)
+	}
 }
 
 func processMessage(process *Process, action eventAction) string {
@@ -295,8 +389,13 @@ func processMessage(process *Process, action eventAction) string {
 		actionString = "is RUNNING"
 	}
 
-	return fmt.Sprintf("Process %v (PID: %d) %v",
-		process.Info.Name, process.Info.PID, actionString)
+	var userString string
+	if process.User != nil {
+		userString = fmt.Sprintf(" by user %v", process.User.Username)
+	}
+
+	return fmt.Sprintf("Process %v (PID: %d)%v %v",
+		process.Info.Name, process.Info.PID, userString, actionString)
 }
 
 func convertToCacheable(processes []*Process) []cache.Cacheable {
@@ -310,83 +409,62 @@ func convertToCacheable(processes []*Process) []cache.Cacheable {
 }
 
 func (ms *MetricSet) getProcesses() ([]*Process, error) {
-	// TODO: Implement Processes() in go-sysinfo
-	// e.g. https://github.com/elastic/go-sysinfo/blob/master/providers/darwin/process_darwin_amd64.go#L41
-	pids, err := process.Pids()
+	var processes []*Process
+
+	sysinfoProcs, err := sysinfo.Processes()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to fetch the list of PIDs")
+		return nil, errors.Wrap(err, "failed to fetch processes")
 	}
 
-	var processes []*Process
-	for _, pid := range pids {
+	for _, sysinfoProc := range sysinfoProcs {
 		var process *Process
 
-		sysinfoProc, err := sysinfo.Process(pid)
+		pInfo, err := sysinfoProc.Info()
 		if err != nil {
 			if os.IsNotExist(err) {
-				// Skip - process probably just terminated since our call
-				// to Pids()
+				// Skip - process probably just terminated since our call to Processes().
 				continue
 			}
 
-			if runtime.GOOS == "windows" && (pid == 0 || os.IsPermission(err)) {
-				// On Windows, the call to Process() can fail if Auditbeat does not have
-				// the necessary access rights, while trying to open the System Process (PID: 0)
-				// will always fail.
+			if os.Geteuid() != 0 && os.IsPermission(err) {
+				// Running as non-root, permission issues when trying to access
+				// other user's private process information are expected.
+
+				if !ms.suppressPermissionWarnings {
+					ms.log.Warnf("Failed to load process information for PID %d as non-root user. "+
+						"Will suppress further errors of this kind. Error: %v", sysinfoProc.PID(), err)
+
+					// Only warn once at the start of Auditbeat.
+					ms.suppressPermissionWarnings = true
+				}
+
 				continue
 			}
 
 			// Record what we can and continue
 			process = &Process{
-				Info: types.ProcessInfo{
-					PID: pid,
-				},
-				Error: errors.Wrapf(err, "failed to load process with PID %d", pid),
+				Info:  pInfo,
+				Error: errors.Wrapf(err, "failed to load process information for PID %d", sysinfoProc.PID()),
+			}
+			process.Info.PID = sysinfoProc.PID() // in case pInfo did not contain it
+		} else {
+			process = &Process{
+				Info: pInfo,
+			}
+		}
+
+		userInfo, err := sysinfoProc.User()
+		if err != nil {
+			if process.Error == nil {
+				process.Error = errors.Wrapf(err, "failed to load user for PID %d", sysinfoProc.PID())
 			}
 		} else {
-			pInfo, err := sysinfoProc.Info()
-			if err == nil {
-				process = &Process{
-					Info: pInfo,
-				}
-			} else {
-				if os.IsNotExist(err) {
-					// Skip - process probably just terminated since our call
-					// to Pids()
-					continue
-				}
+			process.UserInfo = &userInfo
+		}
 
-				if os.Geteuid() != 0 {
-					if os.IsPermission(err) || runtime.GOOS == "darwin" {
-						/*
-							Running as non-root, permission issues when trying to access other user's private
-							process information are expected.
-
-							Unfortunately, for darwin os.IsPermission() does not
-							work because it is a custom error created using errors.New() in
-							getProcTaskAllInfo() in go-sysinfo/providers/darwin/process_darwin_amd64.go
-
-							TODO: Fix go-sysinfo to have better error for darwin.
-						*/
-						if !ms.suppressPermissionWarnings {
-							ms.log.Warnf("Failed to load process information for PID %d as non-root user. "+
-								"Will suppress further errors of this kind. Error: %v", pid, err)
-
-							// Only warn once at the start of Auditbeat.
-							ms.suppressPermissionWarnings = true
-						}
-
-						//continue
-					}
-				}
-
-				// Record what we can and continue
-				process = &Process{
-					Info:  pInfo,
-					Error: errors.Wrapf(err, "failed to load process information for PID %d", pid),
-				}
-				process.Info.PID = pid // in case pInfo did not contain it
-			}
+		// Exclude Linux kernel processes, they are not very interesting.
+		if runtime.GOOS == "linux" && userInfo.UID == "0" && process.Info.Exe == "" {
+			continue
 		}
 
 		processes = append(processes, process)

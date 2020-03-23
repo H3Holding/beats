@@ -29,12 +29,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/libbeat/common/match"
-	"github.com/elastic/beats/libbeat/reader"
-	"github.com/elastic/beats/libbeat/reader/multiline"
-	"github.com/elastic/beats/libbeat/reader/readfile"
-	"github.com/elastic/beats/libbeat/reader/readfile/encoding"
+	"github.com/elastic/beats/v7/libbeat/common"
+	"github.com/elastic/beats/v7/libbeat/common/match"
+	"github.com/elastic/beats/v7/libbeat/reader"
+	"github.com/elastic/beats/v7/libbeat/reader/multiline"
+	"github.com/elastic/beats/v7/libbeat/reader/readfile"
+	"github.com/elastic/beats/v7/libbeat/reader/readfile/encoding"
 )
 
 type logReaderConfig struct {
@@ -133,12 +133,16 @@ func getLogsFromFile(logfile string, conf *logReaderConfig) ([]string, error) {
 	}
 
 	var r reader.Reader
-	r, err = readfile.NewEncodeReader(f, enc, 4096)
+	r, err = readfile.NewEncodeReader(f, readfile.Config{
+		Codec:      enc,
+		BufferSize: 4096,
+		Terminator: readfile.LineFeed,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	r = readfile.NewStripNewline(r)
+	r = readfile.NewStripNewline(r, readfile.LineFeed)
 
 	if conf.multiPattern != "" {
 		p, err := match.Compile(conf.multiPattern)

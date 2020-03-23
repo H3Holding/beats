@@ -1,9 +1,14 @@
 [
     {
-        "ecs.version": "1.0.0-beta2",
+        "event.category": [
+            "web"
+        ],
         "event.dataset": "haproxy.log",
         "event.duration": 2000000,
+        "event.kind": "event",
         "event.module": "haproxy",
+        "event.outcome": "success",
+        "event.timezone": "-02:00",
         "fileset.name": "log",
         "haproxy.backend_name": "docs_microservice",
         "haproxy.backend_queue": 0,
@@ -20,7 +25,6 @@
             "docs.example.internal"
         ],
         "haproxy.http.request.raw_request_line": "GET /component---src-pages-index-js-4b15624544f97cf0bb8f.js HTTP/1.1",
-        "haproxy.http.request.time_active_ms": 2,
         "haproxy.http.request.time_wait_ms": 0,
         "haproxy.http.request.time_wait_without_data_ms": 0,
         "haproxy.http.response.captured_cookie": "-",
@@ -35,12 +39,18 @@
         "log.offset": 0,
         "process.name": "haproxy",
         "process.pid": 32450,
+        "related.ip": [
+            "1.2.3.4"
+        ],
         "service.type": "haproxy",
         "source.address": "1.2.3.4",
-        "source.geo.continent_name": "North America",
-        "source.geo.country_iso_code": "US",
-        "source.geo.location.lat": 37.751,
-        "source.geo.location.lon": -97.822,
+        "source.geo.city_name": "Moscow",
+        "source.geo.continent_name": "Europe",
+        "source.geo.country_iso_code": "RU",
+        "source.geo.location.lat": 55.7527,
+        "source.geo.location.lon": 37.6172,
+        "source.geo.region_iso_code": "RU-MOW",
+        "source.geo.region_name": "Moscow",
         "source.ip": "1.2.3.4",
         "source.port": 38862
     }

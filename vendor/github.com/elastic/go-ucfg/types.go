@@ -26,7 +26,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/elastic/go-ucfg/internal/parse"
+	"github.com/elastic/go-ucfg/parse"
 )
 
 type value interface {
@@ -377,7 +377,7 @@ func (c cfgSub) reify(opts *options) (interface{}, error) {
 	case len(fields) > 0 && len(arr) == 0:
 		m := make(map[string]interface{})
 		for k, v := range fields {
-			opts.activeFields = NewFieldSet(parentFields)
+			opts.activeFields = newFieldSet(parentFields)
 			var err error
 			if m[k], err = v.reify(opts); err != nil {
 				return nil, err
@@ -387,7 +387,7 @@ func (c cfgSub) reify(opts *options) (interface{}, error) {
 	case len(fields) == 0 && len(arr) > 0:
 		m := make([]interface{}, len(arr))
 		for i, v := range arr {
-			opts.activeFields = NewFieldSet(parentFields)
+			opts.activeFields = newFieldSet(parentFields)
 			var err error
 			if m[i], err = v.reify(opts); err != nil {
 				return nil, err
@@ -397,14 +397,14 @@ func (c cfgSub) reify(opts *options) (interface{}, error) {
 	default:
 		m := make(map[string]interface{})
 		for k, v := range fields {
-			opts.activeFields = NewFieldSet(parentFields)
+			opts.activeFields = newFieldSet(parentFields)
 			var err error
 			if m[k], err = v.reify(opts); err != nil {
 				return nil, err
 			}
 		}
 		for i, v := range arr {
-			opts.activeFields = NewFieldSet(parentFields)
+			opts.activeFields = newFieldSet(parentFields)
 			var err error
 			m[fmt.Sprintf("%d", i)], err = v.reify(opts)
 			if err != nil {
@@ -523,7 +523,7 @@ func (r *refDynValue) getValue(
 	}
 	previousErr := err
 
-	str, err := ref.resolveEnv(p.ctx.getParent(), opts)
+	str, parseCfg, err := ref.resolveEnv(p.ctx.getParent(), opts)
 	if err != nil {
 		// TODO(ph): Not everything is an Error, will do some cleanup in another PR.
 		if v, ok := previousErr.(Error); ok {
@@ -533,7 +533,7 @@ func (r *refDynValue) getValue(
 		}
 		return nil, err
 	}
-	return parseValue(p, opts, str)
+	return parseValue(p, opts, str, parseCfg)
 }
 
 func (s spliceDynValue) getValue(
@@ -546,15 +546,19 @@ func (s spliceDynValue) getValue(
 		return nil, err
 	}
 
-	return parseValue(p, opts, str)
+	return parseValue(p, opts, str, parse.DefaultConfig)
 }
 
 func (s spliceDynValue) String() string {
 	return "<splice>"
 }
 
-func parseValue(p *cfgPrimitive, opts *options, str string) (value, error) {
-	ifc, err := parse.Value(str)
+func parseValue(p *cfgPrimitive, opts *options, str string, parseCfg parse.Config) (value, error) {
+	if opts.noParse {
+		return nil, raiseNoParse(p.ctx, p.meta())
+	}
+
+	ifc, err := parse.ValueWithConfig(str, parseCfg)
 	if err != nil {
 		return nil, err
 	}

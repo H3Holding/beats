@@ -20,16 +20,17 @@
 package logstash
 
 import (
-	"github.com/elastic/beats/libbeat/asset"
+	"github.com/elastic/beats/v7/libbeat/asset"
 )
 
 func init() {
-	if err := asset.SetFields("filebeat", "logstash", asset.ModuleFieldsPri, Asset); err != nil {
+	if err := asset.SetFields("filebeat", "logstash", asset.ModuleFieldsPri, AssetLogstash); err != nil {
 		panic(err)
 	}
 }
 
-// Asset returns asset data
-func Asset() string {
-	return "eJzslc1u2zAMgO95CqLnJg/gQy/FChTYD7DtHjA2LWuRSUM/Tf32g+U4cRw5gbdip+kWKeL3mSKlNeypzcCIch5dtQLw2hvK4GGYelgBFORyqxuvhTN4WgHAaQd8kSIYWgGUmkzhsri6BsaaLuJ2w7cNZaCshOY4k4h8GWkS7TR3Fv08Ej2tXYFmYf14iUgordTgK4IhaPyCzeivU7exXz2kYjx6lT21B7HFZO2GUDd+VnSMCWIhN+gcHCqyFBXpjdiDWK00o6dNUslXlnCK7ZU8vftlPq9ciq2xWwbcSfDRwwZmzeqIGgkaUff0jKht/I6koex+Ub7QcU8tIBfwhiYQFLQLSnV2+ux+VkmfIjmHKn2MaDS6yUqDvprbVWtlsVf1NlA6B/RGZiHNiNqk9s3xBpYzcph00dJOuQ5xsyVuJHN5AT4Le9TsYnkFXjdoHRWx0FKg/335p30535PL7b7jAYpQNyBlxB/RJgEZ8I0JSvO2+/Fxp/YVaxocesAtdgf6wIppmwk7g1dugneP8KKNJ+se4Vvw3UxXU89SUO5mSkdkv9W8rbUxeno99I5GWC0T/PROeYgF5HVNUIoduYJm6GmUCxczXsfENWixTmstr50f3nYl3F/mF/mDXLjUKvTX3X2hbfIx+bt3Zv10aXahBKG7mnbtyPnOw/MvHgJIFBIjS/rA5rmxdzdFKv3X8N8BAAD//3IWvbQ="
+// AssetLogstash returns asset data.
+// This is the base64 encoded gzipped contents of module/logstash.
+func AssetLogstash() string {
+	return "eJzsVU1v2zAMvedXED23+QE+9LKtQIB9ANvuhmLTMhdJFPSRxP9+sB0ntiN3SNsVGDDdLFp875FP1APssMlAsfRB+HoFECgozOBu2LpbAZToC0c2EJsMHlcAcD4BX7iMClcAFaEqfdZFH8AIjZO87QqNxQyk42hPO4nM00yzbOe9C9HPI6Ln2BXQIli/njpIqBxrCDXCkLRTsB79Ouc25qeHUoxXT2WHzYFdOYs9Q6hdP2s85QR2UCjhPRxqdNhRxD2aAOxIkhEB10lKoXYo5rCvoLQxFTst2jCILcfQUXHRGDLyhDbiqFguMQTQUQXKUwWdKMBjuAoOGq6CI6vkXYGS0nn7C4t56A/Kd9iAMCXshYoIJW6jlK1mulQk3QJLFhUZzOmWPuBRaNv6Wwsyt9tm8xG46lowwF/Ipb2L3guZNq9QJPwsYkWol05pkk707IKLmG4Q7lHdiKZYrlPnlvAGLK/4MJsdt86H6xT/B8E/MQiWh8CLZH8XByijtsPtOmlSSZy/qcuqKMnk7cfbqfsqNJ7nRgfwHHYL9IYeb+wMO4ONsTH4e3giFdD5e/gWQ7vT3oIPXGLhF8zOvMvJ5JqUovks6TkqNvI2gp+OWMTO74E0QsVuxBXIQI+GBZtygdepcFY4odO0XlS6H8G1l65/mSYlhIJNRTL24/H97dkrzZPv7eue4ofHqd6JUIgeS9g2o0qkG/IerxAkjGmE4bQBlnG7CbMuF3o5A/8dAAD//7rhE3k="
 }

@@ -188,7 +188,7 @@ class Test(BaseTest):
 
         beat.check_wait(exit_code=1)
 
-        assert self.log_contains("Error getting dashboard: error exporting dashboard: Not found") is True
+        assert self.log_contains("error exporting dashboard: Not found") is True
 
     @unittest.skipUnless(INTEGRATION_TESTS, "integration test")
     @attr('integration')
@@ -242,7 +242,7 @@ class Test(BaseTest):
         )
 
         beat.check_wait(exit_code=1)
-        assert self.log_contains("Error getting dashboards from yml")
+        assert self.log_contains("Error exporting dashboards from yml")
         assert self.log_contains("error opening the list of dashboards")
 
     @unittest.skipUnless(INTEGRATION_TESTS, "integration test")
@@ -361,8 +361,8 @@ class Test(BaseTest):
         url = "http://" + self.get_kibana_host() + ":" + self.get_kibana_port() + \
             "/api/spaces/space"
         data = {
-            "id": "foo-bar",
-            "name": "Foo bar space"
+            "id": "libbeat-system-tests",
+            "name": "Libbeat System Tests"
         }
 
         headers = {
@@ -370,7 +370,8 @@ class Test(BaseTest):
         }
 
         r = requests.post(url, json=data, headers=headers)
-        assert r.status_code == 200
+        if r.status_code != 200 and r.status_code != 409:
+            self.fail('Bad Kibana status code when creating space: {}'.format(r.status_code))
 
     def get_version(self):
         url = "http://" + self.get_kibana_host() + ":" + self.get_kibana_port() + \

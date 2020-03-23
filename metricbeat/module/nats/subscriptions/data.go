@@ -22,9 +22,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	s "github.com/elastic/beats/libbeat/common/schema"
-	c "github.com/elastic/beats/libbeat/common/schema/mapstriface"
-	"github.com/elastic/beats/metricbeat/mb"
+	s "github.com/elastic/beats/v7/libbeat/common/schema"
+	c "github.com/elastic/beats/v7/libbeat/common/schema/mapstriface"
+	"github.com/elastic/beats/v7/metricbeat/mb"
 )
 
 var (
@@ -32,10 +32,10 @@ var (
 		"total": c.Int("num_subscriptions"),
 		"cache": s.Object{
 			"size":     c.Int("num_cache"),
-			"hit_rate": c.Int("cache_hit_rate"),
+			"hit_rate": c.Float("cache_hit_rate"),
 			"fanout": s.Object{
 				"max": c.Int("max_fanout"),
-				"avg": c.Int("avg_fanout"),
+				"avg": c.Float("avg_fanout"),
 			},
 		},
 		"inserts": c.Int("num_inserts"),
@@ -50,15 +50,12 @@ func eventMapping(r mb.ReporterV2, content []byte) error {
 
 	err := json.Unmarshal(content, &inInterface)
 	if err != nil {
-		err = errors.Wrap(err, "failure parsing Nats subscriptions API response")
-		r.Error(err)
-		return err
+		return errors.Wrap(err, "failure parsing Nats subscriptions API response")
+
 	}
 	event.MetricSetFields, err = subscriptionsSchema.Apply(inInterface)
 	if err != nil {
-		err = errors.Wrap(err, "failure applying subscriptions schema")
-		r.Error(err)
-		return err
+		return errors.Wrap(err, "failure applying subscriptions schema")
 	}
 
 	r.Event(event)

@@ -18,18 +18,16 @@
 package main
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
-	"go/format"
 	"io/ioutil"
 	"log"
 	"os"
-	"path"
+	"path/filepath"
 
-	"github.com/elastic/beats/libbeat/asset"
-	"github.com/elastic/beats/libbeat/generator/fields"
-	"github.com/elastic/beats/licenses"
+	"github.com/elastic/beats/v7/libbeat/asset"
+	"github.com/elastic/beats/v7/libbeat/generator/fields"
+	"github.com/elastic/beats/v7/licenses"
 )
 
 var usageText = `
@@ -75,6 +73,11 @@ func main() {
 		log.Fatalf("Error fetching modules: %v", err)
 	}
 
+	wd, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("Failed to determine working directory: %v", err)
+	}
+
 	for _, module := range modules {
 		files, err := fields.CollectFiles(module, dir)
 		if err != nil {
@@ -88,30 +91,20 @@ func main() {
 
 		data, err := fields.GenerateFieldsYml(files)
 		if err != nil {
-			log.Fatalf("Error fetching files for module %v: %v", module, err)
+			log.Fatalf("error fetching files for package %v: %v", module, err)
 		}
 
-		encData, err := asset.EncodeData(string(data))
+		p, err := filepath.Rel(wd, filepath.Join(dir, module))
 		if err != nil {
-			log.Fatalf("Error encoding the data: %v", err)
+			log.Fatal(err)
 		}
 
-		var buf bytes.Buffer
-		asset.Template.Execute(&buf, asset.Data{
-			License:  license,
-			Beat:     beatName,
-			Name:     module,
-			Data:     encData,
-			Priority: "asset.ModuleFieldsPri",
-			Package:  module,
-		})
-
-		bs, err := format.Source(buf.Bytes())
+		bs, err := asset.CreateAsset(license, beatName, module, module, data, "asset.ModuleFieldsPri", filepath.ToSlash(p))
 		if err != nil {
 			log.Fatalf("Error creating golang file from template: %v", err)
 		}
 
-		err = ioutil.WriteFile(path.Join(dir, module, "fields.go"), bs, 0644)
+		err = ioutil.WriteFile(filepath.Join(dir, module, "fields.go"), bs, 0644)
 		if err != nil {
 			log.Fatalf("Error writing fields.go: %v", err)
 		}

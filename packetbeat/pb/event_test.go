@@ -25,7 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/ecs/code/go/ecs"
 )
 
@@ -38,7 +38,13 @@ func TestMarshalMapStr(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, common.MapStr{"source": common.MapStr{"ip": "127.0.0.1"}}, m)
+	assert.Equal(t, common.MapStr{
+		"event": common.MapStr{
+			"kind":     "event",
+			"category": "network_traffic",
+		},
+		"source": common.MapStr{"ip": "127.0.0.1"},
+	}, m)
 }
 
 func TestComputeValues(t *testing.T) {

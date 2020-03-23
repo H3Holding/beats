@@ -20,16 +20,17 @@
 package apache
 
 import (
-	"github.com/elastic/beats/libbeat/asset"
+	"github.com/elastic/beats/v7/libbeat/asset"
 )
 
 func init() {
-	if err := asset.SetFields("filebeat", "apache", asset.ModuleFieldsPri, Asset); err != nil {
+	if err := asset.SetFields("filebeat", "apache", asset.ModuleFieldsPri, AssetApache); err != nil {
 		panic(err)
 	}
 }
 
-// Asset returns asset data
-func Asset() string {
-	return "eJysmE2PpDYQhu/9K0p7Xx9y5BApihTlkEiRZu7IbarBGeMiZTMj/n1kPnb7w9A2NKeW6Xrfx1WFwf4OHzgUIDupGjwBeO0NFvDtt3Hg2wmgQqdYd16TLeDXEwDAdBP+pqo3Icg1xL5UZC+6LsBzHwYvGk3lijHgO1jZ4mLzyzgG4IcOC6iZ+m4eiXiNfkZLhw4uxHCW6uNLcgWK2k56fdZG+wG+tG+ATLVYzPazxDXLDY9S6NyP4RhSLPxagrElj6Xubu4uSjKQ393ppG8KcNSzQiGrim8RwtXqmuWUhTmbj8bOGdExeVJkMr2nHIlp9mJDKJVD6a5BPkwRlUlhOFM1lA6tF+fB471dHsi2VgpN75DL8DOTI8SJSFyKZ4u+oSrTsPG+E4z/9ei8iCokTZdz+69nI4h1ra3c03EBu/xEdprsnhnHQ1OcGV1H1mGpqMqt7pzsSUA4L33vYjppHBdkzn7ibuq9opFiL2u0fkdzl2NgaunXn611//uVG1ZW72vJCj+1uq/C9pSi01rV2UrpNUgr/6X7cuzgWJNJxtD2JRgrMqkYnfSqOY6xJpOKEVmPd1CsqKRCUMwkE4GcuPTGxF5MeSjli/qU3OFWDTCv6dYAc7Bhya3lNp/laJHiK+welnWllDdFjbTyZbxnpVZkvbZo/ZFEzx/eNZJ4qpeab0W99TyU2lHslb4L7aliKpwhNf7tONSGUioMY63Jvqh+22LJxdN+eFVDbUhlZuh1rfRccA1tQULmm5Uxf5ds8BNzdwmGahGLS9sOOSfr3E/0eFSKX6dz914d07jdfIxM8fO7/XzDKCuxy7VdDnxyjOfd9dhDIqrw8OF/goczo9O1WcqR0XRENfWkmIcPHgOtWIXrd7Jeautmi/Gkyje4YPz5/v4PvCF/Is9mobt/cMXYIOeo5wOHL+L7km7whuvt7S9YVGHeE/8kWgXZOOvZjTFpjiYRgihKypGPIVvff2IQt9IXEAt6AvreINi+PSMDXSaB8COU2U2lXXb3I1xkInnr6QbOH3OXMbXXbTbqZnXWxhO9q5ghR5NmaK2qV9rWI6GhusZqWWHF6f8AAAD//9lEqWo="
+// AssetApache returns asset data.
+// This is the base64 encoded gzipped contents of module/apache.
+func AssetApache() string {
+	return "eJysl7+O4zgMxvs8BTH9qLgyxQGHAw5X3AELzPSGIjO2MIropegM/PYL/5tNMrIjOXEVyOH3/SjSgvgKH9jtQTfa1LgDECsO9/Dy17DwsgMoMRi2jVjye/hzBwAwvoT/qWxdHxRqYikM+aOt9iDc9otHi64M+yHgFbw+4Wzzx7AGIF2De6iY2mZaiXgNfs7qgAGOxHDQ5uNTcwmGTo0We7DOSgefVmogV84Wk/0kcclyxWMMhvC1HEOKhV9KMJ5IsLDN1dtZSffkN28aLfUeArVsUOmy5GuE/jnZivW4C9NufjcOwamGSciQy/Qe90iN2asVoVQOY5sa+WGKqEwKw4HKrgjoRR06wVu7eyC1SKMYQ0M+oOq1ojIpIG1ALvqfmQh9nIrEpXieUGoqt+X8s8UgKqqQlC7ntl7LThHbynq9pdl67OKMHCz5LRnHQ1Oc5/4oDJW51b1usCBa2hDTSeM4InP2x3ZV7wWNFHtdoZcNzV0MgamlX/62lv1vD21YOLgvJUs8W3NbhfWUommNOrEPOJbdEs1CeCbLgxAUM8lEoKCOrXOxgzAPZUkhn+dRlHjfbmFZVkr5/iqkhavGlv435MV69PLIRk83mQpJ3dVL3W9DrRfuChsodlBuQrurmArnyAx/exxqRSkVhrGy5J9Uv3Wx5OJZ6Z7VUCtSmTv0vFa6L7iENiMhM/FDY4fDM+bevRxVKhaXdskMQVe5F594VIpfY3NvtA3TMEh8j0zxk81+UjPqUm1yPc0TdI7xNDcNPaSiCt+uU5EhPHsGH2f+sSfVc+bqBav++Zu8aOvDZDGM/lLjjPHv+/sPeEM+I09mfXd/ccXYIGd2/sDuk/i2pCu8/fP29h/MqjBNGr+JtgzPmzFGzcFEbTx9Vlz+mWrCdLosyqCbVYeV/t+U+nuNk2ZfiLI11lcDoaOqwnI+j9TuVwAAAP//QYrRgg=="
 }

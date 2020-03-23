@@ -21,14 +21,14 @@ import (
 	"net"
 	"time"
 
-	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/libbeat/logp"
-	"github.com/elastic/beats/libbeat/monitoring"
+	"github.com/elastic/beats/v7/libbeat/common"
+	"github.com/elastic/beats/v7/libbeat/logp"
+	"github.com/elastic/beats/v7/libbeat/monitoring"
 	"github.com/elastic/ecs/code/go/ecs"
 
-	"github.com/elastic/beats/packetbeat/flows"
-	"github.com/elastic/beats/packetbeat/pb"
-	"github.com/elastic/beats/packetbeat/protos"
+	"github.com/elastic/beats/v7/packetbeat/flows"
+	"github.com/elastic/beats/v7/packetbeat/pb"
+	"github.com/elastic/beats/v7/packetbeat/protos"
 
 	"github.com/tsg/gopacket/layers"
 )
@@ -288,6 +288,7 @@ func (icmp *icmpPlugin) publishTransaction(trans *icmpTransaction) {
 	pbf.Source = &ecs.Source{IP: trans.tuple.srcIP.String()}
 	pbf.Destination = &ecs.Destination{IP: trans.tuple.dstIP.String()}
 	pbf.Event.Dataset = "icmp"
+	pbf.Error.Message = trans.notes
 
 	// common fields - group "event"
 	fields := evt.Fields
@@ -339,12 +340,6 @@ func (icmp *icmpPlugin) publishTransaction(trans *icmpTransaction) {
 			pbf.ICMPType = trans.response.Type
 			pbf.ICMPCode = trans.response.code
 		}
-	}
-
-	if len(trans.notes) == 1 {
-		evt.PutValue("error.message", trans.notes[0])
-	} else if len(trans.notes) > 1 {
-		evt.PutValue("error.message", trans.notes)
 	}
 
 	icmp.results(evt)

@@ -18,10 +18,10 @@
 package monitors
 
 import (
-	"github.com/elastic/beats/heartbeat/scheduler"
-	"github.com/elastic/beats/libbeat/beat"
-	"github.com/elastic/beats/libbeat/cfgfile"
-	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/v7/heartbeat/scheduler"
+	"github.com/elastic/beats/v7/libbeat/beat"
+	"github.com/elastic/beats/v7/libbeat/cfgfile"
+	"github.com/elastic/beats/v7/libbeat/common"
 )
 
 // RunnerFactory that can be used to create cfg.Runner cast versions of Monitor
@@ -38,7 +38,7 @@ func NewFactory(sched *scheduler.Scheduler, allowWatches bool) *RunnerFactory {
 
 // Create makes a new Runner for a new monitor with the given Config.
 func (f *RunnerFactory) Create(p beat.Pipeline, c *common.Config, meta *common.MapStrPointer) (cfgfile.Runner, error) {
-	monitor, err := newMonitor(c, globalPluginsReg, p, f.sched, f.allowWatches)
+	monitor, err := newMonitor(c, globalPluginsReg, p, f.sched, f.allowWatches, meta)
 	return monitor, err
 }
 

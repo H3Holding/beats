@@ -22,7 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/v7/libbeat/common"
 )
 
 // Register holds a registry of reloadable objects
@@ -46,6 +46,9 @@ type ReloadableList interface {
 type Reloadable interface {
 	Reload(config *ConfigWithMeta) error
 }
+
+// ReloadableFunc wraps a custom function in order to implement the Reloadable interface.
+type ReloadableFunc func(config *ConfigWithMeta) error
 
 // Registry of reloadable objects and lists
 type Registry struct {
@@ -151,4 +154,9 @@ func (r *Registry) nameTaken(name string) bool {
 	}
 
 	return false
+}
+
+// Reload calls the underlying function.
+func (fn ReloadableFunc) Reload(config *ConfigWithMeta) error {
+	return fn(config)
 }

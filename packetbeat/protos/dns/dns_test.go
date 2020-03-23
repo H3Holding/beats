@@ -31,11 +31,11 @@ import (
 	mkdns "github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/elastic/beats/libbeat/beat"
-	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/libbeat/logp"
-	"github.com/elastic/beats/packetbeat/pb"
-	"github.com/elastic/beats/packetbeat/protos"
+	"github.com/elastic/beats/v7/libbeat/beat"
+	"github.com/elastic/beats/v7/libbeat/common"
+	"github.com/elastic/beats/v7/libbeat/logp"
+	"github.com/elastic/beats/v7/packetbeat/protos"
+	"github.com/elastic/beats/v7/packetbeat/publish"
 )
 
 // Test Constants
@@ -57,6 +57,8 @@ type dnsTestMessage struct {
 	qType       string
 	qName       string
 	qEtld       string
+	qSubdomain  interface{}
+	qTLD        interface{}
 	answers     []string
 	authorities []string
 	additionals []string
@@ -79,18 +81,7 @@ type eventStore struct {
 }
 
 func (e *eventStore) publish(event beat.Event) {
-	pbf, err := pb.GetFields(event.Fields)
-	if err != nil || pbf == nil {
-		panic("_packetbeat not found")
-	}
-	delete(event.Fields, pb.FieldsKey)
-	if err = pbf.ComputeValues(nil); err != nil {
-		panic(err)
-	}
-	if err = pbf.MarshalMapStr(event.Fields); err != nil {
-		panic(err)
-	}
-
+	publish.MarshalPacketbeatFields(&event, nil)
 	e.events = append(e.events, event)
 }
 
@@ -274,7 +265,10 @@ func assertRequest(t testing.TB, m common.MapStr, q dnsTestMessage) {
 	assert.Equal(t, q.qClass, mapValue(t, m, "dns.question.class"))
 	assert.Equal(t, q.qType, mapValue(t, m, "dns.question.type"))
 	assert.Equal(t, q.qName, mapValue(t, m, "dns.question.name"))
+	assert.Equal(t, q.qTLD, mapValue(t, m, "dns.question.top_level_domain"))
+	assert.Equal(t, q.qSubdomain, mapValue(t, m, "dns.question.subdomain"))
 	assert.Equal(t, q.qEtld, mapValue(t, m, "dns.question.etld_plus_one"))
+	assert.Equal(t, q.qEtld, mapValue(t, m, "dns.question.registered_domain"))
 }
 
 // Assert that the specified flags are set.
@@ -321,7 +315,7 @@ func TestRRsToMapStrsWithOPTRecord(t *testing.T) {
 
 	// The OPT record is a pseudo-record so it doesn't become a real record
 	// in our conversion, and there will be 1 entry instead of 2.
-	mapStrs := rrsToMapStrs([]mkdns.RR{o, r})
+	mapStrs, _ := rrsToMapStrs([]mkdns.RR{o, r}, false)
 	assert.Len(t, mapStrs, 1)
 
 	mapStr := mapStrs[0]

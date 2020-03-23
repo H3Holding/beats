@@ -20,10 +20,10 @@ package autodiscover
 import (
 	"errors"
 
-	"github.com/elastic/beats/libbeat/beat"
-	"github.com/elastic/beats/libbeat/cfgfile"
-	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/libbeat/common/bus"
+	"github.com/elastic/beats/v7/libbeat/beat"
+	"github.com/elastic/beats/v7/libbeat/cfgfile"
+	"github.com/elastic/beats/v7/libbeat/common"
+	"github.com/elastic/beats/v7/libbeat/common/bus"
 )
 
 // AutodiscoverAdapter for Filebeat modules & input
@@ -51,10 +51,19 @@ func (m *AutodiscoverAdapter) CreateConfig(e bus.Event) ([]*common.Config, error
 
 // CheckConfig tests given config to check if it will work or not, returns errors in case it won't work
 func (m *AutodiscoverAdapter) CheckConfig(c *common.Config) error {
+	var factory cfgfile.RunnerFactory
+
 	if c.HasField("module") {
-		return m.moduleFactory.CheckConfig(c)
+		factory = m.moduleFactory
+	} else {
+		factory = m.inputFactory
 	}
-	return m.inputFactory.CheckConfig(c)
+
+	if checker, ok := factory.(cfgfile.ConfigChecker); ok {
+		return checker.CheckConfig(c)
+	}
+
+	return nil
 }
 
 // Create a module or input from the given config

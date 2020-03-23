@@ -25,9 +25,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/elastic/beats/libbeat/beat"
-	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/libbeat/logp"
+	"github.com/elastic/beats/v7/libbeat/beat"
+	"github.com/elastic/beats/v7/libbeat/common"
+	"github.com/elastic/beats/v7/libbeat/logp"
 )
 
 func TestAddProcessMetadata(t *testing.T) {
@@ -430,7 +430,7 @@ func TestSelf(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	proc, err := newProcessMetadataProcessor(config)
+	proc, err := New(config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -463,7 +463,7 @@ func TestBadProcess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	proc, err := newProcessMetadataProcessor(config)
+	proc, err := New(config)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -12,12 +12,13 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 
-	mbtest "github.com/elastic/beats/metricbeat/mb/testing"
-	mtest "github.com/elastic/beats/x-pack/metricbeat/module/mssql/testing"
+	mbtest "github.com/elastic/beats/v7/metricbeat/mb/testing"
+	mtest "github.com/elastic/beats/v7/x-pack/metricbeat/module/mssql/testing"
 )
 
 func TestData(t *testing.T) {
 	t.Skip("Skipping `data.json` generation test")
+
 	_, config, err := getHostURI()
 	if err != nil {
 		t.Fatal("error getting config information", err.Error())

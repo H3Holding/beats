@@ -5,12 +5,18 @@
 package system
 
 import (
-	"github.com/elastic/beats/metricbeat/mb"
+	"github.com/elastic/beats/v7/libbeat/logp"
+	"github.com/elastic/beats/v7/metricbeat/mb"
+	"github.com/elastic/go-sysinfo"
+)
+
+const (
+	moduleName = "system"
 )
 
 func init() {
 	// Register the custom ModuleFactory function for the system module.
-	if err := mb.Registry.AddModule("system", NewModule); err != nil {
+	if err := mb.Registry.AddModule(moduleName, NewModule); err != nil {
 		panic(err)
 	}
 }
@@ -28,6 +34,7 @@ type SystemModuleConfig struct {
 type SystemModule struct {
 	mb.BaseModule
 	config SystemModuleConfig
+	hostID string
 }
 
 // Config returns the ModuleConfig used to create the Module.
@@ -45,5 +52,40 @@ func NewModule(base mb.BaseModule) (mb.Module, error) {
 		return nil, err
 	}
 
-	return &SystemModule{BaseModule: base, config: config}, nil
+	log := logp.NewLogger(moduleName)
+
+	var hostID string
+	hostInfo, err := sysinfo.Host()
+	if hostInfo != nil {
+		hostID = hostInfo.Info().UniqueID
+	}
+
+	if hostID == "" {
+		log.Warnf("Could not get host ID, will not fill entity_id fields. Error: %+v", err)
+	}
+
+	return &SystemModule{
+		BaseModule: base,
+		config:     config,
+		hostID:     hostInfo.Info().UniqueID,
+	}, nil
+}
+
+// SystemMetricSet extends the Metricbeat BaseMetricSet.
+type SystemMetricSet struct {
+	mb.BaseMetricSet
+	module *SystemModule
+}
+
+// NewSystemMetricSet creates a new SystemMetricSet.
+func NewSystemMetricSet(base mb.BaseMetricSet) SystemMetricSet {
+	return SystemMetricSet{
+		BaseMetricSet: base,
+		module:        base.Module().(*SystemModule),
+	}
+}
+
+// HostID returns the stored host ID.
+func (ms *SystemMetricSet) HostID() string {
+	return ms.module.hostID
 }
